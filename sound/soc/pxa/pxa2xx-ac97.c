@@ -157,6 +157,7 @@ static const struct snd_soc_dai_ops pxa_ac97_mic_dai_ops = {
 static struct snd_soc_dai_driver pxa_ac97_dai_driver[] = {
 {
 	.name = "pxa2xx-ac97",
+	.bus_control = true,
 	.playback = {
 		.stream_name = "AC97 Playback",
 		.channels_min = 2,
@@ -173,6 +174,7 @@ static struct snd_soc_dai_driver pxa_ac97_dai_driver[] = {
 },
 {
 	.name = "pxa2xx-ac97-aux",
+	.bus_control = true,
 	.playback = {
 		.stream_name = "AC97 Aux Playback",
 		.channels_min = 1,
@@ -189,6 +191,7 @@ static struct snd_soc_dai_driver pxa_ac97_dai_driver[] = {
 },
 {
 	.name = "pxa2xx-ac97-mic",
+	.bus_control = true,
 	.capture = {
 		.stream_name = "AC97 Mic Capture",
 		.channels_min = 1,
