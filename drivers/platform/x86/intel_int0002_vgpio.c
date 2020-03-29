@@ -122,9 +122,15 @@ static irqreturn_t int0002_irq(int irq, void *data)
 	generic_handle_irq(irq_find_mapping(chip->irq.domain,
 					    GPE0A_PME_B0_VIRT_GPIO_PIN));
 
-	pm_wakeup_hard_event(chip->parent);
-
 	return IRQ_HANDLED;
+}
+
+static bool int0002_check_wake(void *data)
+{
+	u32 gpe_sts_reg;
+
+	gpe_sts_reg = inl(GPE0A_STS_PORT);
+	return (gpe_sts_reg & GPE0A_PME_B0_STS_BIT);
 }
 
 static struct irq_chip int0002_byt_irqchip = {
@@ -220,13 +226,13 @@ static int int0002_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	device_init_wakeup(dev, true);
+	acpi_s2idle_register_wake_callback(irq, int0002_check_wake, NULL);
 	return 0;
 }
 
 static int int0002_remove(struct platform_device *pdev)
 {
-	device_init_wakeup(&pdev->dev, false);
+	acpi_s2idle_unregister_wake_callback(int0002_check_wake, NULL);
 	return 0;
 }
 
