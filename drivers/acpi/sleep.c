@@ -943,6 +943,65 @@ static struct acpi_scan_handler lps0_handler = {
 	.attach = lps0_device_attach,
 };
 
+struct s2idle_wake_callback {
+	struct list_head list;
+	bool (*function)(void *data);
+	void *user_data;
+};
+
+static LIST_HEAD(s2idle_wake_callback_head);
+static DEFINE_MUTEX(s2idle_wake_callback_mutex);
+
+/*
+ * Drivers which may share an IRQ with the SCI can use this to register
+ * a callback which returns true when the device they are managing wants
+ * to trigger a wakeup.
+ */
+int acpi_s2idle_register_wake_callback(
+	int wake_irq, bool (*function)(void *data), void *user_data)
+{
+	struct s2idle_wake_callback *callback;
+
+	/*
+	 * If the device is not sharing its IRQ with the SCI, there is no
+	 * need to register the callback.
+	 */
+	if (!acpi_sci_irq_valid() || wake_irq != acpi_sci_irq)
+		return 0;
+
+	callback = kmalloc(sizeof(*callback), GFP_KERNEL);
+	if (!callback)
+		return -ENOMEM;
+
+	callback->function = function;
+	callback->user_data = user_data;
+
+	mutex_lock(&s2idle_wake_callback_mutex);
+	list_add(&callback->list, &s2idle_wake_callback_head);
+	mutex_unlock(&s2idle_wake_callback_mutex);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(acpi_s2idle_register_wake_callback);
+
+void acpi_s2idle_unregister_wake_callback(
+	bool (*function)(void *data), void *user_data)
+{
+	struct s2idle_wake_callback *cb;
+
+	mutex_lock(&s2idle_wake_callback_mutex);
+	list_for_each_entry(cb, &s2idle_wake_callback_head, list) {
+		if (cb->function == function &&
+		    cb->user_data == user_data) {
+			list_del(&cb->list);
+			kfree(cb);
+			break;
+		}
+	}
+	mutex_unlock(&s2idle_wake_callback_mutex);
+}
+EXPORT_SYMBOL_GPL(acpi_s2idle_unregister_wake_callback);
+
 static int acpi_s2idle_begin(void)
 {
 	acpi_scan_lock_acquire();
@@ -992,6 +1051,8 @@ static void acpi_s2idle_sync(void)
 
 static bool acpi_s2idle_wake(void)
 {
+	struct s2idle_wake_callback *cb;
+
 	if (!acpi_sci_irq_valid())
 		return pm_wakeup_pending();
 
@@ -1024,6 +1085,15 @@ static bool acpi_s2idle_wake(void)
 		 */
 		if (acpi_any_gpe_status_set() && !acpi_ec_dispatch_gpe())
 			return true;
+
+		/*
+		 * Check callbacks registered by drivers sharing the SCI.
+		 * Note no need to lock, nothing else is running.
+		 */
+		list_for_each_entry(cb, &s2idle_wake_callback_head, list) {
+			if (cb->function(cb->user_data))
+				return true;
+		}
 
 		/*
 		 * Cancel the wakeup and process all pending events in case

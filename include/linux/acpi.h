@@ -488,6 +488,13 @@ void __init acpi_nvs_nosave_s3(void);
 void __init acpi_sleep_no_blacklist(void);
 #endif /* CONFIG_PM_SLEEP */
 
+#ifdef CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT
+int acpi_s2idle_register_wake_callback(
+	int wake_irq, bool (*function)(void *data), void *user_data);
+void acpi_s2idle_unregister_wake_callback(
+	bool (*function)(void *data), void *user_data);
+#endif
+
 struct acpi_osc_context {
 	char *uuid_str;			/* UUID string */
 	int rev;
