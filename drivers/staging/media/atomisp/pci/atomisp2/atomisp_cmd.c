@@ -23,6 +23,7 @@
 #include <linux/kfifo.h>
 #include <linux/pm_runtime.h>
 #include <linux/timer.h>
+#include <linux/time64.h>
 
 #include <asm/iosf_mbi.h>
 
@@ -686,10 +687,10 @@ static struct videobuf_buffer *atomisp_css_frame_to_vbuf(
 	return NULL;
 }
 
-static void get_buf_timestamp(struct timeval *tv)
+static void get_buf_timestamp(struct old_timeval32 *tv)
 {
-	struct timespec ts;
-	ktime_get_ts(&ts);
+	struct timespec64 ts;
+	ktime_get_ts64(&ts);
 	tv->tv_sec = ts.tv_sec;
 	tv->tv_usec = ts.tv_nsec / NSEC_PER_USEC;
 }
